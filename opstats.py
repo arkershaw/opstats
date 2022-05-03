@@ -34,7 +34,7 @@ class Stats(NamedTuple):
 # Translated from https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
 class OnlineCalculator:
     """
-    Online algorithm for calculating mean, variation, skewness and kurtosis.
+    Online algorithm for calculating mean, sample variance, skewness and kurtosis.
     """
 
     def __init__(self) -> None:
@@ -46,13 +46,14 @@ class OnlineCalculator:
 
     def add(self, x: Union[int, float]) -> None:
         """
-        Adds a new data point to the calculator.
+        Adds a new data point.
 
         Parameters
         ----------
         x:  Union[int, float]
             the data point to add
         """
+
         n1 = self._n
         self._n = self._n + 1
         delta = x - self._mean
@@ -73,6 +74,8 @@ class OnlineCalculator:
         Stats
             Named tuple containing the calculated statistics
         """
+
+        # TODO: Add option for population variance.
         variance = self._M2 / (self._n - 1)
         skew = (sqrt(self._n) * self._M3) / (self._M2 ** (3/2))
         # If all the inputs are the same, M2 will be 0, resulting in a division by 0.
@@ -85,9 +88,9 @@ class OnlineCalculator:
 
 
 # Translated from https://rdrr.io/cran/utilities/src/R/sample.decomp.R
-def merge_stats(stats: List[Stats]) -> Stats:
+def aggregate_stats(stats: List[Stats]) -> Stats:
     """
-    Merges a group of stats previously calculated in parallel.
+    Combines a list of Stats tuples previously calculated in parallel.
 
     Parameters
     ----------
@@ -148,7 +151,8 @@ def merge_stats(stats: List[Stats]) -> Stats:
     pool.var = pool.SS / (pool.n - 1)
     pool.sd = sqrt(pool.var)
 
-    # Third pass - calculate the skew.
+    # Third pass - calculate the skew and kurtosis.
+    # TODO: Implement alternative adjustments.
     def skew_adj(n: float) -> float:
         return 1
         return ((n-1)/n)**(3/2)  # 'Moment', 'b', 'Minitab'

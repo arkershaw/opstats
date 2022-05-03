@@ -1,11 +1,10 @@
 from math import sqrt
-from typing import Iterable, List, Union
 import unittest
 
-from opstats import Stats, OnlineCalculator, merge_stats
+from opstats import Stats, OnlineCalculator, aggregate_stats
 
 
-SAMPLE_DATA: List[int] = [
+SAMPLE_DATA = [
     25, 97, 76, 94, 49, 85, 65, 77, 22, 13,
     55, 99, 90, 59, 95, 79, 38, 2, 83, 60,
     21, 14, 52, 44, 48, 84, 51, 82, 72, 30,
@@ -71,7 +70,7 @@ class TestOnlineCalculator(unittest.TestCase):
         result = self.calculate()
         self.compare_stats(scipy_result, result)
 
-    def test_merge_stats(self) -> None:
+    def test_aggregate_stats(self) -> None:
         scipy_result = self.calculate_scipy()
 
         left_data = SAMPLE_DATA[:len(SAMPLE_DATA)//2]
@@ -82,6 +81,6 @@ class TestOnlineCalculator(unittest.TestCase):
         right = OnlineCalculator()
         for d in right_data:
             right.add(d)
-        result = merge_stats([left.get(), right.get()])
+        result = aggregate_stats([left.get(), right.get()])
 
         self.compare_stats(scipy_result, result)
