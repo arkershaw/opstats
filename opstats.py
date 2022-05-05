@@ -1,10 +1,5 @@
 from math import sqrt
 from typing import NamedTuple, List, Union
-from dataclasses import dataclass
-
-
-class InvalidStateException(Exception):
-    pass
 
 
 class Stats(NamedTuple):
@@ -27,12 +22,12 @@ class Stats(NamedTuple):
         the kurtosis (Pearson)
     """
 
-    sample_count: int
-    mean: float
-    variance: float
-    standard_deviation: float
-    skewness: float
-    kurtosis: float
+    sample_count: int = 0
+    mean: float = 0.0
+    variance: float = 0.0
+    standard_deviation: float = 0.0
+    skewness: float = 0.0
+    kurtosis: float = -3.0
 
 
 # Adapted from https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
@@ -51,6 +46,11 @@ class OnlineCalculator:
             set to True to calculate the sample varaiance instead of the population variance
         """
 
+        if sample_variance is None:
+            raise ValueError('Argument "sample_variance" must be a bool, received None.')
+        elif type(sample_variance) is not bool:
+            raise ValueError(f'Argument "sample_variance" must be a bool, received {type(sample_variance)}')
+
         self._sample_var = sample_variance
         self._n = 0
         self._mean = 0
@@ -68,16 +68,17 @@ class OnlineCalculator:
             the data point to add
         """
 
-        n1 = self._n
-        self._n = self._n + 1
-        delta = x - self._mean
-        delta_n = delta / self._n
-        delta_n2 = delta_n * delta_n
-        term1 = delta * delta_n * n1
-        self._mean = self._mean + delta_n
-        self._M4 = self._M4 + term1 * delta_n2 * (self._n * self._n - 3 * self._n + 3) + 6 * delta_n2 * self._M2 - 4 * delta_n * self._M3
-        self._M3 = self._M3 + term1 * delta_n * (self._n - 2) - 3 * delta_n * self._M2
-        self._M2 = self._M2 + term1
+        if x is not None:
+            n1 = self._n
+            self._n = self._n + 1
+            delta = x - self._mean
+            delta_n = delta / self._n
+            delta_n2 = delta_n * delta_n
+            term1 = delta * delta_n * n1
+            self._mean = self._mean + delta_n
+            self._M4 = self._M4 + term1 * delta_n2 * (self._n * self._n - 3 * self._n + 3) + 6 * delta_n2 * self._M2 - 4 * delta_n * self._M3
+            self._M3 = self._M3 + term1 * delta_n * (self._n - 2) - 3 * delta_n * self._M2
+            self._M2 = self._M2 + term1
 
     def get(self) -> Stats:
         """
@@ -87,15 +88,13 @@ class OnlineCalculator:
         -------
         Stats
             named tuple containing the calculated statistics
-
-        Raises
-        ------
-        InvalidStateException
-            less than two data points have been added
         """
 
-        if self._n < 2:
-            raise InvalidStateException('At least two data points must be added.')
+        if self._n < 1:
+            return Stats()
+        elif self._n == 1:
+            # There will be no variance for a single data point.
+            return Stats(self._n, self._mean)
 
         if self._sample_var:
             var = self._M2 / (self._n - 1)
@@ -106,11 +105,9 @@ class OnlineCalculator:
         if self._M2 > 0:
             skew = (sqrt(self._n) * self._M3) / (self._M2 ** (3 / 2))
             kurt = (self._n * self._M4) / (self._M2 * self._M2) - 3
+            return Stats(self._n, self._mean, var, sqrt(var), skew, kurt)
         else:
-            skew = 0.0
-            kurt = -3.0
-
-        return Stats(self._n, self._mean, var, sqrt(var), skew, kurt)
+            return Stats(self._n, self._mean, var)
 
 
 # Translated from https://rdrr.io/cran/utilities/src/R/sample.decomp.R
@@ -131,17 +128,33 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False) -> Stats:
         the combined statistics
     """
 
-    @dataclass
+    if sample_variance is None:
+        raise ValueError('Argument "sample_variance" must be a bool, received None.')
+    elif type(sample_variance) is not bool:
+        raise ValueError(f'Argument "sample_variance" must be a bool, received {type(sample_variance)}')
+
+    if stats is None:
+        raise ValueError('Argument "stats" must be a list of Stats, received None.')
+    elif type(stats) is not list:
+        raise ValueError(f'Argument "stats" must be a list of Stats, received {type(stats)}')
+    else:
+        stats = list(filter(lambda s: s is not None and type(s) is Stats and s.sample_count > 0, stats))
+        if len(stats) == 0:
+            return Stats()
+        elif len(stats) == 1:
+            return stats[0]
+
     class Pool:
-        n: int = 0
-        mean: float = 0.0
-        SS: float = 0.0
-        var: float = 0.0
-        sd: float = 0.0
-        SC: float = 0.0
-        skew: float = 0.0
-        SQ: float = 0.0
-        kurt: float = 0.0
+        def __init__(self) -> None:
+            self.n: int = 0
+            self.mean: float = 0.0
+            self.SS: float = 0.0
+            self.var: float = 0.0
+            self.sd: float = 0.0
+            self.SC: float = 0.0
+            self.skew: float = 0.0
+            self.SQ: float = 0.0
+            self.kurt: float = 0.0
 
     pool = Pool()
 
@@ -179,6 +192,11 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False) -> Stats:
         sum_n_dev_4 += sample.sample_count * _dev ** 4
 
     pool.SS = sum_ss + sum_n_dev_2
+
+    # If all the inputs are the same, SS will be 0, resulting in a division by 0.
+    if pool.SS == 0.0:
+        return Stats(pool.n, pool.mean)
+
     if sample_variance:
         pool.var = pool.SS / (pool.n - 1)
     else:
@@ -221,11 +239,4 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False) -> Stats:
     pool.SQ = sum_sq + 4 * sum_sc_dev + 6 * sum_ss_dev_2 + sum_n_dev_4
     pool.kurt = kurt_adj(pool.n) * pool.n * pool.SQ / pool.SS ** 2 + excess_adj(pool.n)
 
-    return Stats(
-        pool.n,
-        pool.mean,
-        pool.var,
-        pool.sd,
-        pool.skew,
-        pool.kurt
-    )
+    return Stats(pool.n, pool.mean, pool.var, pool.sd, pool.skew, pool.kurt)
