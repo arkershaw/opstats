@@ -57,6 +57,16 @@ class TestOnlineCalculator(BaseTestCases.TestStats):
         result = self.calculate(RANDOM_INTS)
         self.compare_stats(scipy_result, result)
 
+    def test_sample_bias_integers(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_INTS, sample_variance=True, bias_adjust=True)
+        result = self.calculate(RANDOM_INTS, sample_variance=True, bias_adjust=True)
+        self.compare_stats(scipy_result, result)
+
+    def test_population_bias_integers(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_INTS, bias_adjust=True)
+        result = self.calculate(RANDOM_INTS, bias_adjust=True)
+        self.compare_stats(scipy_result, result)
+
     def test_sample_variance_floats(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS, sample_variance=True)
         result = self.calculate(RANDOM_FLOATS, sample_variance=True)
@@ -65,4 +75,14 @@ class TestOnlineCalculator(BaseTestCases.TestStats):
     def test_population_variance_floats(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS)
         result = self.calculate(RANDOM_FLOATS)
+        self.compare_stats(scipy_result, result)
+
+    def test_sample_bias_floats(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS, sample_variance=True, bias_adjust=True)
+        result = self.calculate(RANDOM_FLOATS, sample_variance=True, bias_adjust=True)
+        self.compare_stats(scipy_result, result)
+
+    def test_population_bias_floats(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS, bias_adjust=True)
+        result = self.calculate(RANDOM_FLOATS, bias_adjust=True)
         self.compare_stats(scipy_result, result)

@@ -13,13 +13,13 @@ class Stats(NamedTuple):
     mean: float
         the mean value of all data points
     variance: float
-        the calculated variance (population or sample depending on parameters)
+        the calculated population or sample variance
     standard_deviation: float
         the standard deviation (sqrt(variance)) for convenience
     skew: float
-        the skewness (Fisher-Pearson)
+        the skewness
     kurtosis: float
-        the kurtosis (Pearson)
+        the excess kurtosis
     """
 
     sample_count: int = 0
@@ -36,7 +36,7 @@ class OnlineCalculator:
     Online algorithm for calculating mean, variance, skewness and kurtosis.
     """
 
-    def __init__(self, sample_variance: bool = False) -> None:
+    def __init__(self, sample_variance: bool = False, bias_adjust: bool = False) -> None:
         """
         Initialise a new calculator.
 
@@ -44,6 +44,8 @@ class OnlineCalculator:
         ----------
         sample_variance: bool, optional
             set to True to calculate the sample varaiance instead of the population variance
+        bias_adjust: bool, optional
+            set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
         """
 
         if sample_variance is None:
@@ -51,7 +53,14 @@ class OnlineCalculator:
         elif type(sample_variance) is not bool:
             raise ValueError(f'Argument "sample_variance" must be a bool, received {type(sample_variance)}')
 
+        if bias_adjust is None:
+            raise ValueError('Argument "bias_adjust" must be a bool, received None.')
+        elif type(bias_adjust) is not bool:
+            raise ValueError(f'Argument "bias_adjust" must be a bool, received {type(bias_adjust)}')
+
         self._sample_var = sample_variance
+        self._adjust = bias_adjust
+
         self._n = 0
         self._mean = 0
         self._M2 = 0
@@ -104,14 +113,19 @@ class OnlineCalculator:
         # If all the inputs are the same, M2 will be 0, resulting in a division by 0.
         if self._M2 > 0:
             skew = (sqrt(self._n) * self._M3) / (self._M2 ** (3 / 2))
-            kurt = (self._n * self._M4) / (self._M2 * self._M2) - 3
+            kurt = (self._n * self._M4) / (self._M2 * self._M2)
+            if self._adjust:
+                skew = skew * sqrt(self._n * (self._n - 1)) / (self._n - 2)
+                kurt = kurt * (self._n + 1) * (self._n - 1) / ((self._n - 2) * (self._n - 3)) - 3 * (self._n - 1) ** 2 / ((self._n - 2) * (self._n - 3))
+            else:
+                kurt = kurt - 3
             return Stats(self._n, self._mean, var, sqrt(var), skew, kurt)
         else:
             return Stats(self._n, self._mean, var)
 
 
 # Translated from https://rdrr.io/cran/utilities/src/R/sample.decomp.R
-def aggregate_stats(stats: List[Stats], sample_variance: bool = False) -> Stats:
+def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adjust: bool = False) -> Stats:
     """
     Combines a list of Stats tuples previously calculated in parallel.
 
@@ -121,6 +135,8 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False) -> Stats:
         list of separate instances of calculated statistics from one data set
     sample_variance: bool, optional
         population variance is calculated by default. Set to True to calculate the sample varaiance
+    bias_adjust: bool, optional
+        set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
 
     Returns
     -------
@@ -132,6 +148,11 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False) -> Stats:
         raise ValueError('Argument "sample_variance" must be a bool, received None.')
     elif type(sample_variance) is not bool:
         raise ValueError(f'Argument "sample_variance" must be a bool, received {type(sample_variance)}')
+
+    if bias_adjust is None:
+        raise ValueError('Argument "bias_adjust" must be a bool, received None.')
+    elif type(bias_adjust) is not bool:
+        raise ValueError(f'Argument "bias_adjust" must be a bool, received {type(bias_adjust)}')
 
     if stats is None:
         raise ValueError('Argument "stats" must be a list of Stats, received None.')
@@ -204,20 +225,23 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False) -> Stats:
     pool.sd = sqrt(pool.var)
 
     # Third pass - calculate the skew and kurtosis.
-    # TODO: Implement Adjusted Fisher Pearson.
     def skew_adj(n: float) -> float:
-        return 1
-        return ((n - 1) / n) ** (3 / 2)  # 'Moment', 'b', 'Minitab'
-        return sqrt(n * (n - 1)) / (n - 2)  # 'Adjusted Fisher Pearson', 'G', 'Excel', 'SPSS', 'SAS'
+        if bias_adjust:
+            return sqrt(n * (n - 1)) / (n - 2)
+        else:
+            return 1
 
     def kurt_adj(n: float) -> float:
-        return 1
-        return ((n - 1) / n) ** 2  # 'Moment', 'b', 'Minitab'
-        return (n + 1) * (n - 1) / ((n - 2) * (n - 3))  # 'Adjusted Fisher Pearson', 'G', 'Excel', 'SPSS', 'SAS'
+        if bias_adjust:
+            return (n + 1) * (n - 1) / ((n - 2) * (n - 3))
+        else:
+            return 1
 
     def excess_adj(n: float) -> float:
-        return -3  # Excess
-        return -3 * (n - 1) ** 2 / ((n - 2) * (n - 3))  # Excess 'Adjusted Fisher Pearson', 'G', 'Excel', 'SPSS', 'SAS
+        if bias_adjust:
+            return -3 * (n - 1) ** 2 / ((n - 2) * (n - 3))
+        else:
+            return -3
 
     SC = []
     SQ = []

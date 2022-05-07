@@ -18,7 +18,7 @@ class BaseTestCases:
             self.assertAlmostEqual(left.skewness, right.skewness)
             self.assertAlmostEqual(left.kurtosis, right.kurtosis)
 
-        def calculate_scipy(self, data_points: Union[List[int], List[float]], sample_variance: bool = False) -> Stats:
+        def calculate_scipy(self, data_points: Union[List[int], List[float]], sample_variance: bool = False, bias_adjust: bool = False) -> Stats:
             count = len(data_points)
             mean = numpy.mean(data_points)
             if sample_variance:
@@ -27,13 +27,13 @@ class BaseTestCases:
             else:
                 var = numpy.var(data_points)
                 sd = numpy.std(data_points)
-            skew = scipy.stats.skew(data_points)
-            kurt = scipy.stats.kurtosis(data_points)
+            skew = scipy.stats.skew(data_points, bias=not bias_adjust)
+            kurt = scipy.stats.kurtosis(data_points, bias=not bias_adjust)
 
             return Stats(count, mean, var, sd, skew, kurt)
 
-        def calculate(self, data_points: Union[List[int], List[float]], sample_variance: bool = False) -> Stats:
-            calculator = OnlineCalculator(sample_variance=sample_variance)
+        def calculate(self, data_points: Union[List[int], List[float]], sample_variance: bool = False, bias_adjust: bool = False) -> Stats:
+            calculator = OnlineCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust)
             for data_point in data_points:
                 calculator.add(data_point)
             return calculator.get()

@@ -11,26 +11,26 @@ RANDOM_FLOATS = list(numpy.random.rand(101))
 
 
 class TestAggregateStats(BaseTestCases.TestStats):
-    def calculate_parallel(self, data_points: Union[List[int], List[float]], sample_variance: bool = False) -> Stats:
+    def calculate_parallel(self, data_points: Union[List[int], List[float]], sample_variance: bool = False, bias_adjust: bool = False) -> Stats:
         # Split the list into three to get uneven sample sizes.
         size = len(data_points) // 3
 
         first_data = data_points[:size]
-        first_calc = OnlineCalculator(sample_variance=sample_variance)
+        first_calc = OnlineCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust)
         for d in first_data:
             first_calc.add(d)
 
         second_data = data_points[size:size * 2]
-        second_calc = OnlineCalculator(sample_variance=sample_variance)
+        second_calc = OnlineCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust)
         for d in second_data:
             second_calc.add(d)
 
         third_data = data_points[size * 2:]
-        third_calc = OnlineCalculator(sample_variance=sample_variance)
+        third_calc = OnlineCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust)
         for d in third_data:
             third_calc.add(d)
 
-        return aggregate_stats([first_calc.get(), second_calc.get(), third_calc.get()], sample_variance=sample_variance)
+        return aggregate_stats([first_calc.get(), second_calc.get(), third_calc.get()], sample_variance=sample_variance, bias_adjust=bias_adjust)
 
     def test_none(self) -> None:
         with self.assertRaisesRegex(ValueError, 'Argument "stats" must be a list of Stats, received'):
@@ -86,6 +86,16 @@ class TestAggregateStats(BaseTestCases.TestStats):
         result = self.calculate_parallel(RANDOM_INTS)
         self.compare_stats(scipy_result, result)
 
+    def test_aggregate_sample_bias_integers(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_INTS, sample_variance=True, bias_adjust=True)
+        result = self.calculate_parallel(RANDOM_INTS, sample_variance=True, bias_adjust=True)
+        self.compare_stats(scipy_result, result)
+
+    def test_aggregate_population_bias_integers(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_INTS, bias_adjust=True)
+        result = self.calculate_parallel(RANDOM_INTS, bias_adjust=True)
+        self.compare_stats(scipy_result, result)
+
     def test_aggregate_sample_floats(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS, sample_variance=True)
         result = self.calculate_parallel(RANDOM_FLOATS, sample_variance=True)
@@ -94,4 +104,14 @@ class TestAggregateStats(BaseTestCases.TestStats):
     def test_aggregate_population_floats(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS)
         result = self.calculate_parallel(RANDOM_FLOATS)
+        self.compare_stats(scipy_result, result)
+
+    def test_aggregate_sample_bias_floats(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS, sample_variance=True, bias_adjust=True)
+        result = self.calculate_parallel(RANDOM_FLOATS, sample_variance=True, bias_adjust=True)
+        self.compare_stats(scipy_result, result)
+
+    def test_aggregate_population_bias_floats(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS, bias_adjust=True)
+        result = self.calculate_parallel(RANDOM_FLOATS, bias_adjust=True)
         self.compare_stats(scipy_result, result)
