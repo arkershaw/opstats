@@ -2,7 +2,7 @@ from typing import List, Union
 
 import numpy
 
-from opstats import Stats, OnlineCalculator, aggregate_stats
+from opstats import Stats, aggregate_stats
 from tests.base import BaseTestCases
 
 # Use 101 elements to get uneven sample sizes when dividing into three lists.
@@ -16,21 +16,15 @@ class TestAggregateStats(BaseTestCases.TestStats):
         size = len(data_points) // 3
 
         first_data = data_points[:size]
-        first_calc = OnlineCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust)
-        for d in first_data:
-            first_calc.add(d)
+        first_stats = self.calculate(first_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
 
         second_data = data_points[size:size * 2]
-        second_calc = OnlineCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust)
-        for d in second_data:
-            second_calc.add(d)
+        second_stats = self.calculate(second_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
 
         third_data = data_points[size * 2:]
-        third_calc = OnlineCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust)
-        for d in third_data:
-            third_calc.add(d)
+        third_stats = self.calculate(third_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
 
-        return aggregate_stats([first_calc.get(), second_calc.get(), third_calc.get()], sample_variance=sample_variance, bias_adjust=bias_adjust)
+        return aggregate_stats([first_stats, second_stats, third_stats], sample_variance=sample_variance, bias_adjust=bias_adjust)
 
     def test_none(self) -> None:
         with self.assertRaisesRegex(ValueError, 'Argument "stats" must be a list of Stats, received'):

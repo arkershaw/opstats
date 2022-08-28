@@ -1,9 +1,9 @@
 # opstats
-Python implementation of an online parallel statistics calculator. This library will calculate the total, mean, variance, standard deviation, skewness and kurtosis.
+Python implementation of an online parallel statistics calculator. This library will calculate the total, mean, variance, standard deviation, skewness and kurtosis. There are additional options for calculating covariance and correlation between two sequences of data points.
 
 Online calculation is appropriate when you don't yet have the entire dataset in order to calculate the mean (e.g. in a streaming environment). It is more processor-intensive than the traditional methods however.
 
-When combined with parallel computation, it can also be useful when the data is very large as it works in a single pass.
+When combined with parallel computation, it can also be useful when the data is very large as it works in a single pass and can be distributed.
 
 ## Installation
 
@@ -44,6 +44,10 @@ for d in right_data:
 # Combine the results.
 result = aggregate_stats([left.get(), right.get()])
 ```
+
+### Covariance and Correlation
+
+The `OnlineCovariance` class and `aggregate_covariance` function work in the same manner as above for calculating the covariance and correlation between two sequences of data points.
 
 ## Credits
 

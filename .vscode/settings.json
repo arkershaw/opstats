@@ -12,5 +12,6 @@
     "python.linting.flake8Enabled": true,
     "python.linting.flake8Args": [
         "--ignore=E501,E128,E124,E123,E126"
-    ]
+    ],
+    "python.languageServer": "Pylance"
 }
