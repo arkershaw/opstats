@@ -15,39 +15,42 @@ When combined with parallel computation, it can also be useful when the data is 
 
 ```
 import random
-from opstats import OnlineCalculator
+from opstats import MomentCalculator
 data_points = random.sample(range(1, 100), 20)
-stats = OnlineCalculator()
+calc = MomentCalculator()
 for d in data_points:
-    stats.add(d)
-result = stats.get()
+    calc.add(d)
+
+result = calc.get()
 ```
 
-The result will be a NamedTuple containing the computed statistics up until this point. More data can subsequently be added and the result can be retrieved again.
+The result will be a NamedTuple containing the computed moments up until this point. More data can subsequently be added and the result can be retrieved again.
 
 ### Parallel Processing
 
-Data can be split into multiple parts and processed in parallel. The resulting statistics can be combined using the `aggregate_stats` function.
+Data can be split into multiple parts and processed in parallel. The resulting statistics can be combined using the `aggregate_moments` function.
 
 ```
-from opstats import aggregate_stats
+from opstats import aggregate_moments
 # Divide the sample data in half.
 left_data = data_points[:len(data_points)//2]
 right_data = data_points[len(data_points)//2:]
 # Create stats for each half. 
-left = OnlineCalculator()
+left = MomentCalculator()
 for d in left_data:
     left.add(d)
-right = OnlineCalculator()
+
+right = MomentCalculator()
 for d in right_data:
     right.add(d)
+
 # Combine the results.
-result = aggregate_stats([left.get(), right.get()])
+result = aggregate_moments([left.get(), right.get()])
 ```
 
 ### Covariance and Correlation
 
-The `OnlineCovariance` class and `aggregate_covariance` function work in the same manner as above for calculating the covariance and correlation between two sequences of data points.
+The `CovarianceCalculator` class and `aggregate_covariance` function work in the same manner as above for calculating the covariance and correlation between two sequences of data points.
 
 ## Credits
 

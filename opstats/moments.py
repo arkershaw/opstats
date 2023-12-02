@@ -2,7 +2,7 @@ from math import sqrt
 from typing import NamedTuple, List, Union
 
 
-class Stats(NamedTuple):
+class Moments(NamedTuple):
     """
     Results of moment calculations.
 
@@ -31,7 +31,7 @@ class Stats(NamedTuple):
 
 
 # Adapted from https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
-class OnlineCalculator:
+class MomentCalculator:
     """
     Online algorithm for calculating mean, variance, skewness and kurtosis.
     """
@@ -89,21 +89,21 @@ class OnlineCalculator:
             self._M3 += term1 * delta_n * (self._n - 2) - 3 * delta_n * self._M2
             self._M2 += term1
 
-    def get(self) -> Stats:
+    def get(self) -> Moments:
         """
-        Gets the statistics for all data points added so far.
+        Gets the moments for all data points added so far.
 
         Returns
         -------
-        Stats
-            named tuple containing the calculated statistics
+        Moments
+            named tuple containing the calculated moments
         """
 
         if self._n < 1:
-            return Stats()
+            return Moments()
         elif self._n == 1:
             # There will be no variance for a single data point.
-            return Stats(self._n, self._mean)
+            return Moments(self._n, self._mean)
 
         if self._sample_var:
             var = self._M2 / (self._n - 1)
@@ -119,20 +119,20 @@ class OnlineCalculator:
                 kurt = kurt * (self._n + 1) * (self._n - 1) / ((self._n - 2) * (self._n - 3)) - 3 * (self._n - 1) ** 2 / ((self._n - 2) * (self._n - 3))
             else:
                 kurt = kurt - 3
-            return Stats(self._n, self._mean, var, sqrt(var), skew, kurt)
+            return Moments(self._n, self._mean, var, sqrt(var), skew, kurt)
         else:
-            return Stats(self._n, self._mean, var)
+            return Moments(self._n, self._mean, var)
 
 
 # Translated from https://rdrr.io/cran/utilities/src/R/sample.decomp.R
-def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adjust: bool = False) -> Stats:
+def aggregate_moments(moments: List[Moments], sample_variance: bool = False, bias_adjust: bool = False) -> Moments:
     """
-    Combines a list of Stats tuples previously calculated in parallel.
+    Combines a list of Moment tuples previously calculated in parallel.
 
     Parameters
     ----------
-    stats: List[Stats]
-        list of separate instances of calculated statistics from one data set
+    moments: List[Moments]
+        list of separate instances of calculated moments from one data set
     sample_variance: bool, optional
         population variance is calculated by default. Set to True to calculate the sample varaiance
     bias_adjust: bool, optional
@@ -140,8 +140,8 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adju
 
     Returns
     -------
-    Stats
-        the combined statistics
+    Moments
+        the combined moments
     """
 
     if sample_variance is None:
@@ -154,16 +154,16 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adju
     elif type(bias_adjust) is not bool:
         raise ValueError(f'Argument "bias_adjust" must be a bool, received {type(bias_adjust)}')
 
-    if stats is None:
+    if moments is None:
         raise ValueError('Argument "stats" must be a list of Stats, received None.')
-    elif type(stats) is not list:
-        raise ValueError(f'Argument "stats" must be a list of Stats, received {type(stats)}')
+    elif type(moments) is not list:
+        raise ValueError(f'Argument "stats" must be a list of Stats, received {type(moments)}')
     else:
-        stats = list(filter(lambda s: s is not None and type(s) is Stats and s.sample_count > 0, stats))
-        if len(stats) == 0:
-            return Stats()
-        elif len(stats) == 1:
-            return stats[0]
+        moments = list(filter(lambda s: s is not None and type(s) is Moments and s.sample_count > 0, moments))
+        if len(moments) == 0:
+            return Moments()
+        elif len(moments) == 1:
+            return moments[0]
 
     class Pool:
         def __init__(self) -> None:
@@ -183,7 +183,7 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adju
     SS = []
     sum_mean = 0.0
     sum_ss = 0.0
-    for sample in stats:
+    for sample in moments:
         pool.n += sample.sample_count
         sum_mean += (sample.mean * sample.sample_count)
         if sample_variance:
@@ -202,8 +202,8 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adju
     sum_ss_dev = 0.0
     sum_ss_dev_2 = 0.0
     sum_n_dev_4 = 0.0
-    for i in range(len(stats)):
-        sample = stats[i]
+    for i in range(len(moments)):
+        sample = moments[i]
         _dev = sample.mean - pool.mean
         deviation.append(_dev)
         sum_n_dev_2 += sample.sample_count * _dev ** 2
@@ -216,7 +216,7 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adju
 
     # If all the inputs are the same, SS will be 0, resulting in a division by 0.
     if pool.SS == 0.0:
-        return Stats(pool.n, pool.mean)
+        return Moments(pool.n, pool.mean)
 
     if sample_variance:
         pool.var = pool.SS / (pool.n - 1)
@@ -248,8 +248,8 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adju
     sum_sc = 0.0
     sum_sq = 0.0
     sum_sc_dev = 0.0
-    for i in range(len(stats)):
-        sample = stats[i]
+    for i in range(len(moments)):
+        sample = moments[i]
         _sc = sample.skewness * (SS[i] ** (3 / 2)) / (skew_adj(sample.sample_count) * sqrt(sample.sample_count))
         SC.append(_sc)
         sum_sc += _sc
@@ -263,172 +263,4 @@ def aggregate_stats(stats: List[Stats], sample_variance: bool = False, bias_adju
     pool.SQ = sum_sq + 4 * sum_sc_dev + 6 * sum_ss_dev_2 + sum_n_dev_4
     pool.kurt = kurt_adj(pool.n) * pool.n * pool.SQ / pool.SS ** 2 + excess_adj(pool.n)
 
-    return Stats(pool.n, pool.mean, pool.var, pool.sd, pool.skew, pool.kurt)
-
-
-class CovarianceStats:
-    """
-    Results of covariance calculations.
-
-    Attributes
-    ----------
-    sample_count int
-        the total number of data points
-    stats_x: Stats
-        the stats for the first series
-    stats_y: Stats
-        the stats for the second series
-    comoment: float
-        the calculated co-moment, used for aggregation
-    covariance: float
-        the calculated population or sample covariance
-    correlation: float
-        the calculated correlation coefficient
-    """
-
-    def __init__(self, stats_x: Stats, stats_y: Stats, comoment: float, covariance: float, correlation: float) -> None:
-        assert(stats_x.sample_count == stats_y.sample_count)
-        self.sample_count = stats_x.sample_count
-        self.stats_x = stats_x
-        self.stats_y = stats_y
-        self.comoment = comoment
-        self.covariance = covariance
-        self.correlation = correlation
-
-
-class OnlineCovariance:
-    """
-    Online algorithm for calculating covariance and correlation.
-    """
-
-    def __init__(self, sample_covariance: bool = False) -> None:
-        """
-        Initialise a new calculator.
-
-        Parameters
-        ----------
-        sample_covariance: bool, optional
-            set to True to calculate the sample covariance instead of the population covariance
-        """
-
-        if sample_covariance is None:
-            raise ValueError('Argument "sample_covariance" must be a bool, received None.')
-        elif type(sample_covariance) is not bool:
-            raise ValueError(f'Argument "sample_covariance" must be a bool, received {type(sample_covariance)}')
-
-        self._sample_covar = sample_covariance
-
-        self._stats_x = OnlineCalculator(sample_variance=sample_covariance)
-        self._stats_y = OnlineCalculator(sample_variance=sample_covariance)
-        self._C = 0
-
-    def add(self, x: Union[int, float], y: Union[int, float]) -> None:
-        """
-        Adds a new data point.
-
-        Parameters
-        ----------
-        x:  Union[int, float]
-            the first value of the data point to add
-        y:  Union[int, float]
-            the second value of the data point to add
-        """
-
-        if x is not None and y is not None:
-            dx = x - self._stats_x._mean
-            self._stats_x.add(x)
-            self._stats_y.add(y)
-            self._C += dx * (y - self._stats_y._mean)
-
-    def get(self) -> CovarianceStats:
-        """
-        Gets the covariance statistics for all data points added so far.
-
-        Returns
-        -------
-        CovarianceStats
-            the calculated covariance statistics
-        """
-
-        x = self._stats_x.get()
-        y = self._stats_y.get()
-        n = x.sample_count
-
-        assert(n == y.sample_count)
-
-        if n < 1:
-            return CovarianceStats(Stats(), Stats(), 0.0, 0.0, 0.0)
-        elif self._sample_covar:
-            # Bessel's correction for sample variance
-            c = 1
-        else:
-            c = 0
-
-        cov = self._C / (n - c)
-
-        # If all the inputs are the same, standard_deviation will be 0, resulting in a division by 0.
-        if x.standard_deviation == 0 or y.standard_deviation == 0:
-            cor = 0.0
-        else:
-            cor = self._C / (x.standard_deviation * y.standard_deviation) / (n - c)
-
-        return CovarianceStats(x, y, self._C, cov, cor)
-
-
-def aggregate_covariance(stats: List[CovarianceStats], sample_covariance: bool = False) -> CovarianceStats:
-    """
-    Combines a list of covariance statistics previously calculated in parallel.
-
-    Parameters
-    ----------
-    stats: List[CovarianceStats]
-        list of separate instances of calculated covariances from one data set
-    sample_covariance: bool, optional
-        population covariance is calculated by default. Set to True to calculate the sample covariance
-
-    Returns
-    -------
-    CovarianceStats
-        the combined covariance statistics
-    """
-
-    def _merge(left: CovarianceStats, right: CovarianceStats) -> CovarianceStats:
-        x_agg = aggregate_stats([left.stats_x, right.stats_x], sample_variance=sample_covariance)
-        y_agg = aggregate_stats([left.stats_y, right.stats_y], sample_variance=sample_covariance)
-        com = left.comoment + right.comoment + (left.stats_x.mean - right.stats_x.mean) * (left.stats_y.mean - right.stats_y.mean) * ((left.sample_count * right.sample_count) / (left.sample_count + right.sample_count))
-        if sample_covariance:
-            # Bessel's correction for sample variance
-            c = 1
-        else:
-            c = 0
-
-        cov = com / (left.sample_count + right.sample_count - c)
-
-        # If all the inputs are the same, standard_deviation will be 0, resulting in a division by 0.
-        if x_agg.standard_deviation == 0 or y_agg.standard_deviation == 0:
-            cor = 0.0
-        else:
-            cor = com / (x_agg.standard_deviation * y_agg.standard_deviation) / (x_agg.sample_count - c)
-
-        return CovarianceStats(x_agg, y_agg, com, cov, cor)
-
-    if sample_covariance is None:
-        raise ValueError('Argument "sample_covariance" must be a bool, received None.')
-    elif type(sample_covariance) is not bool:
-        raise ValueError(f'Argument "sample_covariance" must be a bool, received {type(sample_covariance)}')
-
-    if stats is None:
-        raise ValueError('Argument "stats" must be a list of CovarianceStats, received None.')
-    elif type(stats) is not list:
-        raise ValueError(f'Argument "stats" must be a list of CovarianceStats, received {type(stats)}')
-    else:
-        stats = list(filter(lambda s: s is not None and type(s) is CovarianceStats and s.sample_count > 0, stats))
-        if len(stats) == 0:
-            return CovarianceStats(Stats(), Stats(), 0.0, 0.0, 0.0)
-        elif len(stats) == 1:
-            return stats[0]
-
-    result = stats[0]
-    for i in range(1, len(stats)):
-        result = _merge(result, stats[i])
-    return result
+    return Moments(pool.n, pool.mean, pool.var, pool.sd, pool.skew, pool.kurt)
