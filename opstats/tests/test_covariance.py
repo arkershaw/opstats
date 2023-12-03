@@ -1,16 +1,17 @@
 import numpy
 
-from opstats import Covariance, CovarianceCalculator, Moments
+from opstats.covariance import Covariance, CovarianceCalculator
+from opstats.moments import Moments
 
 from opstats.tests.base import BaseTestCases
 
 MEAN = [50, 50]
 COV_MATRIX = [[100.0, 0], [0, 100]]
-# Use 101 elements to get uneven sample sizes when dividing into three lists.
-RANDOM_FLOATS = numpy.random.multivariate_normal(MEAN, COV_MATRIX, 101).T
+# Use an even number of elements to get uneven sample sizes when dividing into three lists.
+RANDOM_FLOATS = numpy.random.multivariate_normal(MEAN, COV_MATRIX, 1000).T
 
 
-class TestCovarianceCalculator(BaseTestCases.TestCovarianceStats):
+class TestCovarianceCalculator(BaseTestCases.TestCovariance):
     def test_invalid_parameters(self) -> None:
         with self.assertRaisesRegex(ValueError, 'Argument "sample_covariance" must be a bool, received'):
             CovarianceCalculator(sample_covariance=None)  # type: ignore

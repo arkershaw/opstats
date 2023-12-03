@@ -2,6 +2,8 @@ from typing import Union, List
 
 from opstats.moments import Moments, MomentCalculator, aggregate_moments
 
+__all__ = ['Covariance', 'CovarianceCalculator', 'aggregate_covariance']
+
 
 class Covariance:
     """
@@ -56,8 +58,8 @@ class CovarianceCalculator:
 
         self._sample_covar = sample_covariance
 
-        self._stats_x = MomentCalculator(sample_variance=sample_covariance)
-        self._stats_y = MomentCalculator(sample_variance=sample_covariance)
+        self._moment_x = MomentCalculator(sample_variance=sample_covariance)
+        self._moment_y = MomentCalculator(sample_variance=sample_covariance)
         self._C = 0
 
     def add(self, x: Union[int, float], y: Union[int, float]) -> None:
@@ -73,10 +75,10 @@ class CovarianceCalculator:
         """
 
         if x is not None and y is not None:
-            dx = x - self._stats_x._mean
-            self._stats_x.add(x)
-            self._stats_y.add(y)
-            self._C += dx * (y - self._stats_y._mean)
+            dx = x - self._moment_x._mean
+            self._moment_x.add(x)
+            self._moment_y.add(y)
+            self._C += dx * (y - self._moment_y._mean)
 
     def get(self) -> Covariance:
         """
@@ -84,12 +86,12 @@ class CovarianceCalculator:
 
         Returns
         -------
-        CovarianceStats
+        Covariance
             the calculated covariance statistics
         """
 
-        x = self._stats_x.get()
-        y = self._stats_y.get()
+        x = self._moment_x.get()
+        y = self._moment_y.get()
         n = x.sample_count
 
         assert (n == y.sample_count)
@@ -113,20 +115,20 @@ class CovarianceCalculator:
         return Covariance(x, y, self._C, cov, cor)
 
 
-def aggregate_covariance(stats: List[Covariance], sample_covariance: bool = False) -> Covariance:
+def aggregate_covariance(covariance: List[Covariance], sample_covariance: bool = False) -> Covariance:
     """
     Combines a list of covariance statistics previously calculated in parallel.
 
     Parameters
     ----------
-    stats: List[CovarianceStats]
+    covariance: List[Covariance]
         list of separate instances of calculated covariances from one data set
     sample_covariance: bool, optional
         population covariance is calculated by default. Set to True to calculate the sample covariance
 
     Returns
     -------
-    CovarianceStats
+    Covariance
         the combined covariance statistics
     """
 
@@ -155,18 +157,18 @@ def aggregate_covariance(stats: List[Covariance], sample_covariance: bool = Fals
     elif type(sample_covariance) is not bool:
         raise ValueError(f'Argument "sample_covariance" must be a bool, received {type(sample_covariance)}')
 
-    if stats is None:
-        raise ValueError('Argument "stats" must be a list of CovarianceStats, received None.')
-    elif type(stats) is not list:
-        raise ValueError(f'Argument "stats" must be a list of CovarianceStats, received {type(stats)}')
+    if covariance is None:
+        raise ValueError('Argument "covariance" must be a list of Covariance, received None.')
+    elif type(covariance) is not list:
+        raise ValueError(f'Argument "covariance" must be a list of Covariance, received {type(covariance)}')
     else:
-        stats = list(filter(lambda s: s is not None and type(s) is Covariance and s.sample_count > 0, stats))
-        if len(stats) == 0:
+        covariance = list(filter(lambda s: s is not None and type(s) is Covariance and s.sample_count > 0, covariance))
+        if len(covariance) == 0:
             return Covariance(Moments(), Moments(), 0.0, 0.0, 0.0)
-        elif len(stats) == 1:
-            return stats[0]
+        elif len(covariance) == 1:
+            return covariance[0]
 
-    result = stats[0]
-    for i in range(1, len(stats)):
-        result = _merge(result, stats[i])
+    result = covariance[0]
+    for i in range(1, len(covariance)):
+        result = _merge(result, covariance[i])
     return result

@@ -6,6 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "opstats"
 version = "1.2.0"
 description = "Online parallel statistics calculator."
+authors = [
+  {email = "arkershaw@users.noreply.github.com"}
+]
 readme = "README.md"
 requires-python = ">=3.6"
 keywords = ["statistics", "parallel", "streaming"]
@@ -26,3 +29,6 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/arkershaw/opstats"
 Issues = "https://github.com/arkershaw/opstats/issues"
+
+[project.optional-dependencies]
+extended = ["hyperloglog", "tdigest"]

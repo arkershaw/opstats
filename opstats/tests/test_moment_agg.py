@@ -2,57 +2,57 @@ from typing import List, Union
 
 import numpy
 
-from opstats import Moments, aggregate_moments
+from opstats.moments import Moments, aggregate_moments
 from opstats.tests.base import BaseTestCases
 
-# Use 101 elements to get uneven sample sizes when dividing into three lists.
-RANDOM_INTS = list(numpy.random.randint(1, 100, 101))
-RANDOM_FLOATS = list(numpy.random.rand(101))
+# Use an even number of elements to get uneven sample sizes when dividing into three lists.
+RANDOM_INTS = list(numpy.random.randint(1, 100, 1000))
+RANDOM_FLOATS = list(numpy.random.rand(1000))
 
 
-class TestAggregateMoments(BaseTestCases.TestStats):
+class TestAggregateMoments(BaseTestCases.TestMoments):
     def calculate_parallel(self, data_points: Union[List[int], List[float]], sample_variance: bool = False, bias_adjust: bool = False) -> Moments:
         # Split the list into three to get uneven sample sizes.
         size = len(data_points) // 3
 
         first_data = data_points[:size]
-        first_stats = self.calculate(first_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
+        first_moments = self.calculate(first_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
 
         second_data = data_points[size:size * 2]
-        second_stats = self.calculate(second_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
+        second_moments = self.calculate(second_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
 
         third_data = data_points[size * 2:]
-        third_stats = self.calculate(third_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
+        third_moments = self.calculate(third_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
 
-        return aggregate_moments([first_stats, second_stats, third_stats], sample_variance=sample_variance, bias_adjust=bias_adjust)
+        return aggregate_moments([first_moments, second_moments, third_moments], sample_variance=sample_variance, bias_adjust=bias_adjust)
 
     def test_none(self) -> None:
-        with self.assertRaisesRegex(ValueError, 'Argument "stats" must be a list of Stats, received'):
+        with self.assertRaisesRegex(ValueError, 'Argument "moments" must be a list of Moments, received'):
             aggregate_moments(None)  # type: ignore
 
     def test_invalid_type(self) -> None:
-        stats = 'Moments()'
-        with self.assertRaisesRegex(ValueError, 'Argument "stats" must be a list of Stats, received'):
-            aggregate_moments(stats)  # type: ignore
+        moments = 'Moments()'
+        with self.assertRaisesRegex(ValueError, 'Argument "moments" must be a list of Moments, received'):
+            aggregate_moments(moments)  # type: ignore
 
     def test_invalid_parameters(self) -> None:
-        stats = Moments(1, 5.0)
+        moments = Moments(1, 5.0)
 
         with self.assertRaisesRegex(ValueError, 'Argument "sample_variance" must be a bool, received'):
-            aggregate_moments([stats], sample_variance=None)  # type: ignore
+            aggregate_moments([moments], sample_variance=None)  # type: ignore
 
         with self.assertRaisesRegex(ValueError, 'Argument "sample_variance" must be a bool, received'):
-            aggregate_moments([stats], sample_variance='')  # type: ignore
+            aggregate_moments([moments], sample_variance='')  # type: ignore
 
     def test_invalid_items(self) -> None:
-        stats = [Moments(1, 5.0), 'Stats()']
-        result = aggregate_moments(stats)
-        self.compare_moments(stats[0], result)
+        moments = [Moments(1, 5.0), 'Moments()']
+        result = aggregate_moments(moments)
+        self.compare_moments(moments[0], result)
 
         # Second item has sample count of zero.
-        stats = [Moments(1, 5.0), Moments(0, 10.0)]
-        result = aggregate_moments(stats)
-        self.compare_moments(stats[0], result)
+        moments = [Moments(1, 5.0), Moments(0, 10.0)]
+        result = aggregate_moments(moments)
+        self.compare_moments(moments[0], result)
 
     def test_empty(self) -> None:
         empty = Moments()
@@ -66,8 +66,8 @@ class TestAggregateMoments(BaseTestCases.TestStats):
 
     def test_uniform_values(self) -> None:
         expected = Moments(2, 5.0)
-        stats = [Moments(1, 5.0), Moments(1, 5.0)]
-        result = aggregate_moments(stats)
+        moments = [Moments(1, 5.0), Moments(1, 5.0)]
+        result = aggregate_moments(moments)
         self.compare_moments(expected, result)
 
     def test_aggregate_sample_integers(self) -> None:

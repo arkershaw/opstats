@@ -11,7 +11,9 @@ When combined with parallel computation, it can also be useful when the data is 
 
 ## Usage
 
-### Online Calculator
+### Moment Calculator
+
+For calculating the mean, variance (and standard deviation), skewness and kurtosis, use the MomentCalculator.
 
 ```
 import random
@@ -52,6 +54,39 @@ result = aggregate_moments([left.get(), right.get()])
 
 The `CovarianceCalculator` class and `aggregate_covariance` function work in the same manner as above for calculating the covariance and correlation between two sequences of data points.
 
+### Extended Statistics
+
+When installed with `pip install opstats[extended]`, cardinality and percentiles can also be estimated. Cardinality will be estimated with HyperLogLog and percentiles with T-Digest.
+
+```
+from opstats.extended import ExtendedCalculator
+calc = ExtendedCalculator()
+for d in data_points:
+    calc.add(d)
+
+result = calc.get()
+```
+
+This can also be calculated in parallel. Note the changes to using `get_parallel()` which returns an intermediate object and `calculate()` which computes the final values.
+
+```
+from opstats.extended import aggregate_extended
+# Divide the sample data in half.
+left_data = data_points[:len(data_points)//2]
+right_data = data_points[len(data_points)//2:]
+# Create stats for each half. 
+left = ExtendedCalculator()
+for d in left_data:
+    left.add(d)
+
+right = ExtendedCalculator()
+for d in right_data:
+    right.add(d)
+
+# Combine the results.
+result = aggregate_extended([left.get_parallel(), right.get_parallel()]).calculate()
+```
+
 ## Credits
 
 Online calculator adapted from:
@@ -60,3 +95,9 @@ https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
 
 Aggregation translated from:
 https://rdrr.io/cran/utilities/src/R/sample.decomp.R
+
+Python HyperLogLog implementation:
+https://github.com/svpcom/hyperloglog
+
+Python T-Digest implementation:
+https://github.com/CamDavidsonPilon/tdigest

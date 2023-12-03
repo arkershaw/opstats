@@ -1,6 +1,8 @@
 from math import sqrt
 from typing import NamedTuple, List, Union
 
+__all__ = ['Moments', 'MomentCalculator', 'aggregate_moments']
+
 
 class Moments(NamedTuple):
     """
@@ -155,9 +157,9 @@ def aggregate_moments(moments: List[Moments], sample_variance: bool = False, bia
         raise ValueError(f'Argument "bias_adjust" must be a bool, received {type(bias_adjust)}')
 
     if moments is None:
-        raise ValueError('Argument "stats" must be a list of Stats, received None.')
+        raise ValueError('Argument "moments" must be a list of Moments, received None.')
     elif type(moments) is not list:
-        raise ValueError(f'Argument "stats" must be a list of Stats, received {type(moments)}')
+        raise ValueError(f'Argument "moments" must be a list of Moments, received {type(moments)}')
     else:
         moments = list(filter(lambda s: s is not None and type(s) is Moments and s.sample_count > 0, moments))
         if len(moments) == 0:
