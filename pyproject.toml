@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "opstats"
-version = "1.2.0"
+version = "1.2.1"
 description = "Online parallel statistics calculator."
 authors = [
   {email = "arkershaw@users.noreply.github.com"}
@@ -32,3 +32,4 @@ Issues = "https://github.com/arkershaw/opstats/issues"
 
 [project.optional-dependencies]
 extended = ["hyperloglog", "tdigest"]
+test = ["numpy", "scipy"]

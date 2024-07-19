@@ -8,7 +8,6 @@
     ],
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": true,
-    "python.analysis.typeCheckingMode": "basic",
     "flake8.args": [
         "--ignore=E501,E128,E124,E123,E126"
     ],

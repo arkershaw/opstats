@@ -7,6 +7,41 @@ from hyperloglog import HyperLogLog
 __all__ = ['ExtendedStats', 'ParallelStats', 'ExtendedCalculator', 'aggregate_extended']
 
 DEFAULT_ACCURACY = 0.01
+Centroids = List[Tuple[float, int]]
+HLLState = Tuple[float, int, int, List[int]]
+
+
+def _get_centroids(tdigest: TDigest) -> Centroids:
+    return [(float(c['m']), int(c['c'])) for c in tdigest.centroids_to_list()]
+
+
+def _from_centroids(tdigest: TDigest, centroids: Centroids) -> None:
+    c = [{'m': c[0], 'c': c[1]} for c in centroids]
+    tdigest.update_centroids_from_list(c)
+
+
+def _get_state(hll: Optional[HyperLogLog] = None) -> HLLState:
+    if hll is None:
+        hll = HyperLogLog(DEFAULT_ACCURACY)
+
+    assert hll.__slots__ == ('alpha', 'p', 'm', 'M')
+
+    state = hll.__getstate__()
+
+    return (state['alpha'], state['p'], state['m'], state['M'])
+
+
+def _from_state(hll: HyperLogLog, state: HLLState) -> HyperLogLog:
+    assert hll.__slots__ == ('alpha', 'p', 'm', 'M')
+
+    state = {
+        'alpha': state[0],
+        'p': state[1],
+        'm': state[2],
+        'M': state[3],
+    }
+
+    hll.__setstate__(state)
 
 
 class ExtendedStats(NamedTuple):
@@ -59,12 +94,12 @@ class ParallelStats(NamedTuple):
         the results of moment calculations
     centroids: List[Tuple[float, int]]
         the list of centroids used for approximating percentiles
-    state: Dict[str, str]
+    state: Tuple[float, int, int, List[int]]
         the state required for calculating cardinality
     """
-    moments: Moments
-    centroids: List[Tuple[float, int]]
-    state: Dict[str, str]
+    moments: Moments = Moments()
+    centroids: Centroids = []
+    state: HLLState = _get_state()
 
     def calculate(self, percentiles: Optional[Iterable[int]] = None) -> ExtendedStats:
         """
@@ -87,7 +122,7 @@ class ParallelStats(NamedTuple):
             _from_centroids(tdigest, self.centroids)
 
             hll = HyperLogLog(DEFAULT_ACCURACY)
-            hll.__setstate__(self.state)
+            _from_state(hll, self.state)
 
             median = tdigest.percentile(50)
             perc_25 = tdigest.percentile(25)
@@ -120,15 +155,6 @@ class ParallelStats(NamedTuple):
                 iq_r,
                 pc_res
             )
-
-
-def _get_centroids(tdigest: TDigest) -> List[Tuple[float, int]]:
-    return [(float(c['m']), int(c['c'])) for c in tdigest.centroids_to_list()]
-
-
-def _from_centroids(tdigest: TDigest, centroids: List[Tuple[float, int]]) -> None:
-    c = [{'m': c[0], 'c': c[1]} for c in centroids]
-    tdigest.update_centroids_from_list(c)
 
 
 class ExtendedCalculator:
@@ -188,7 +214,8 @@ class ExtendedCalculator:
         """
         moments = self._moment_calc.get()
         centroids = _get_centroids(self._tdigest)
-        return ParallelStats(moments, centroids, self._hll.__getstate__())
+        state = _get_state(self._hll)
+        return ParallelStats(moments, centroids, state)
 
     def get(self) -> ExtendedStats:
         """
@@ -248,23 +275,21 @@ def aggregate_extended(stats: List[ParallelStats], sample_variance: bool = False
     for s in stats:
         if hll is None:
             hll = HyperLogLog(DEFAULT_ACCURACY)
-            hll.__setstate__(s.state)
+            _from_state(hll, s.state)
         else:
             hll_new = HyperLogLog(DEFAULT_ACCURACY)
-            hll_new.__setstate__(s.state)
+            _from_state(hll_new, s.state)
             hll.update(hll_new)
 
         _from_centroids(tdigest, s.centroids)
         moments.append(s.moments)
 
-    if hll is None:
-        # Shouldn't happen but required for linting.
-        state = {}
-    else:
-        state = hll.__getstate__()
+    moments = aggregate_moments(moments, sample_variance, bias_adjust)
+    centroids = _get_centroids(tdigest)
+    state = _get_state(hll)
 
     return ParallelStats(
-        aggregate_moments(moments, sample_variance, bias_adjust),
-        _get_centroids(tdigest),
+        moments,
+        centroids,
         state
     )
