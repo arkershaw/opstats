@@ -25,9 +25,18 @@ for d in data_points:
     calc.add(d)
 
 result = calc.get()
+
+print(f'Sample Count: {result.sample_count}')
+print(f'Mean: {result.mean}')
+print(f'Variance: {result.variance}')
+print(f'Standard Deviation: {result.standard_deviation}')
+print(f'Skewness: {result.skewness}')
+print(f'Kurtosis: {result.kurtosis}')
 ```
 
 The result will be a NamedTuple containing the computed moments up until this point. More data can subsequently be added and the result can be retrieved again.
+
+_Note: If no data is added to the calculator, the mean will be returned as zero rather than NaN. You can determine if there is any data using the sample_count property._
 
 ### Parallel Processing
 
@@ -66,6 +75,13 @@ for d in data_points:
     calc.add(d)
 
 result = calc.get()
+
+print(f'Sample Count: {result.sample_count}')
+print(f'Mean: {result.mean}')
+# All stats from MomentCalculator are available plus:
+print(f'Cardinality: {result.cardinality}')
+print(f'Median: {result.median}')
+print(f'Interquartile Range: {result.interquartile_range}')
 ```
 
 This can also be calculated in parallel. Note the changes to using `get_parallel()` which returns an intermediate object and `calculate()` which computes the final values.

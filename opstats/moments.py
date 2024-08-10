@@ -11,17 +11,17 @@ class Moments(NamedTuple):
     Attributes
     ----------
     sample_count: int
-        the total number of data points
+        The total number of data points
     mean: float
-        the mean value of all data points
+        The mean value of all data points
     variance: float
-        the calculated population or sample variance
+        The calculated population or sample variance
     standard_deviation: float
-        the standard deviation (sqrt(variance)) for convenience
+        The standard deviation (sqrt(variance)) for convenience
     skew: float
-        the skewness
+        The skewness
     kurtosis: float
-        the excess kurtosis
+        The excess kurtosis
     """
 
     sample_count: int = 0
@@ -45,9 +45,9 @@ class MomentCalculator:
         Parameters
         ----------
         sample_variance: bool, optional
-            set to True to calculate the sample varaiance instead of the population variance
+            Set to True to calculate the sample varaiance instead of the population variance
         bias_adjust: bool, optional
-            set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
+            Set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
         """
 
         if sample_variance is None:
@@ -76,7 +76,7 @@ class MomentCalculator:
         Parameters
         ----------
         x:  Union[int, float]
-            the data point to add
+            The data point to add
         """
 
         if x is not None:
@@ -98,7 +98,7 @@ class MomentCalculator:
         Returns
         -------
         Moments
-            named tuple containing the calculated moments
+            Named tuple containing the calculated moments
         """
 
         if self._n < 1:
@@ -134,16 +134,16 @@ def aggregate_moments(moments: List[Moments], sample_variance: bool = False, bia
     Parameters
     ----------
     moments: List[Moments]
-        list of separate instances of calculated moments from one data set
+        List of separate instances of calculated moments from one data set
     sample_variance: bool, optional
-        population variance is calculated by default. Set to True to calculate the sample varaiance
+        Population variance is calculated by default. Set to True to calculate the sample varaiance
     bias_adjust: bool, optional
-        set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
+        Set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
 
     Returns
     -------
     Moments
-        the combined moments
+        The combined moments
     """
 
     if sample_variance is None:

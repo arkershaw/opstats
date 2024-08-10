@@ -12,17 +12,17 @@ class Covariance:
     Attributes
     ----------
     sample_count int
-        the total number of data points
+        The total number of data points
     moments_x: Moments
-        the moments for the first series
+        The moments for the first series
     moments_y: Moments
-        the moments for the second series
+        The moments for the second series
     comoment: float
-        the calculated co-moment, used for aggregation
+        The calculated co-moment, used for aggregation
     covariance: float
-        the calculated population or sample covariance
+        The calculated population or sample covariance
     correlation: float
-        the calculated correlation coefficient
+        The calculated correlation coefficient
     """
 
     def __init__(self, moments_x: Moments, moments_y: Moments, comoment: float, covariance: float, correlation: float) -> None:
@@ -48,7 +48,7 @@ class CovarianceCalculator:
         Parameters
         ----------
         sample_covariance: bool, optional
-            set to True to calculate the sample covariance instead of the population covariance
+            Set to True to calculate the sample covariance instead of the population covariance
         """
 
         if sample_covariance is None:
@@ -69,9 +69,9 @@ class CovarianceCalculator:
         Parameters
         ----------
         x:  Union[int, float]
-            the first value of the data point to add
+            The first value of the data point to add
         y:  Union[int, float]
-            the second value of the data point to add
+            The second value of the data point to add
         """
 
         if x is not None and y is not None:
@@ -87,7 +87,7 @@ class CovarianceCalculator:
         Returns
         -------
         Covariance
-            the calculated covariance statistics
+            The calculated covariance statistics
         """
 
         x = self._moment_x.get()
@@ -122,14 +122,14 @@ def aggregate_covariance(covariance: List[Covariance], sample_covariance: bool =
     Parameters
     ----------
     covariance: List[Covariance]
-        list of separate instances of calculated covariances from one data set
+        List of separate instances of calculated covariances from one data set
     sample_covariance: bool, optional
-        population covariance is calculated by default. Set to True to calculate the sample covariance
+        Population covariance is calculated by default. Set to True to calculate the sample covariance
 
     Returns
     -------
     Covariance
-        the combined covariance statistics
+        The combined covariance statistics
     """
 
     def _merge(left: Covariance, right: Covariance) -> Covariance:
