@@ -91,3 +91,13 @@ class TestStatsCalculator(BaseTestCases.TestStats):
         scipy_result = self.calculate_scipy(RANDOM_FLOATS, bias_adjust=True)
         result = self.calculate(RANDOM_FLOATS, bias_adjust=True).calculate()
         self.compare_stats(scipy_result, result)
+
+    def test_without_estimation(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS)
+        result = self.calculate(RANDOM_FLOATS, estimate_threshold=0).calculate()
+        self.compare_stats(scipy_result, result)
+
+    def test_with_estimation(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS)
+        result = self.calculate(RANDOM_FLOATS, estimate_threshold=1).calculate()
+        self.compare_stats(scipy_result, result)

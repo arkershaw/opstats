@@ -129,8 +129,8 @@ class BaseTestCases:
                 {}
             )
 
-        def calculate(self, data_points: List[Union[int, float]], sample_variance: bool = False, bias_adjust: bool = False) -> ParallelStats:
-            calculator = ExtendedCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust)
+        def calculate(self, data_points: List[Union[int, float]], sample_variance: bool = False, bias_adjust: bool = False, estimate_threshold: int = -1) -> ParallelStats:
+            calculator = ExtendedCalculator(sample_variance=sample_variance, bias_adjust=bias_adjust, estimate_threshold=estimate_threshold)
             for data_point in data_points:
                 calculator.add(data_point)
             return calculator.get_parallel()

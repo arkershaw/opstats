@@ -1,8 +1,11 @@
 from typing import NamedTuple, List, Union, Tuple, Dict, Optional, Iterable
+import math
 
-from opstats.moments import MomentCalculator, aggregate_moments, Moments
 from tdigest import TDigest
 from hyperloglog import HyperLogLog
+
+from opstats.moments import MomentCalculator, aggregate_moments, Moments
+import opstats.utils as utils
 
 __all__ = ['ExtendedStats', 'ParallelStats', 'ExtendedCalculator', 'aggregate_extended']
 
@@ -51,25 +54,25 @@ class ExtendedStats(NamedTuple):
     Attributes
     ----------
     sample_count: int
-        the total number of data points
+        The total number of data points
     mean: float
-        the mean value of all data points
+        The mean value of all data points
     variance: float
-        the calculated population or sample variance
+        The calculated population or sample variance
     standard_deviation: float
-        the standard deviation (sqrt(variance)) for convenience
+        The standard deviation (sqrt(variance)) for convenience
     skew: float
-        the skewness
+        The skewness
     kurtosis: float
-        the excess kurtosis
+        The excess kurtosis
     cardinality: int
-        the approximate number of unique values
+        The approximate number of unique values
     median: float
-        the approximate median value
+        The approximate median value
     interquartile_range: float
-        the approximate interquartile range
+        The approximate interquartile range
     percentiles: Dict[int, float]
-        the calculated percentile values
+        The calculated percentile values
     """
     sample_count: int = 0
     mean: float = 0.0
@@ -91,15 +94,18 @@ class ParallelStats(NamedTuple):
     Attributes
     ----------
     moments: Moments
-        the results of moment calculations
+        The results of moment calculations
     centroids: List[Tuple[float, int]]
-        the list of centroids used for approximating percentiles
+        The list of centroids used for approximating percentiles
     state: Tuple[float, int, int, List[int]]
-        the state required for calculating cardinality
+        The state required for calculating cardinality
+    values: List[Union[int, float]]
+        The raw values if estimates are not being used
     """
     moments: Moments = Moments()
     centroids: Centroids = []
     state: HLLState = _get_state()
+    values: List[Union[int, float]] = []
 
     def calculate(self, percentiles: Optional[Iterable[int]] = None) -> ExtendedStats:
         """
@@ -108,40 +114,60 @@ class ParallelStats(NamedTuple):
         Parameters
         ----------
         percentiles: Optional[Iterable[int]]
-            list of additional percentiles to calculate (mean and interquartile range are always calculated)
+            List of additional percentiles to calculate (mean and interquartile range are always calculated)
 
         Returns
         -------
         Stats
-            the calculated moments, cardinality and percentiles
+            The calculated moments, cardinality and percentiles
         """
         if self.moments.sample_count == 0:
             return ExtendedStats()
         else:
-            tdigest = TDigest()
-            _from_centroids(tdigest, self.centroids)
-
-            hll = HyperLogLog(DEFAULT_ACCURACY)
-            _from_state(hll, self.state)
-
-            median = tdigest.percentile(50)
-            perc_25 = tdigest.percentile(25)
-            perc_75 = tdigest.percentile(75)
-            iq_r = perc_75 - perc_25
-
             pc_res: Dict[int, float] = {}
-            if percentiles is None:
-                pc_res = {}
+
+            if len(self.values) == 0:
+                tdigest = TDigest()
+                _from_centroids(tdigest, self.centroids)
+
+                hll = HyperLogLog(DEFAULT_ACCURACY)
+                _from_state(hll, self.state)
+                card = round(hll.card())
+
+                median = tdigest.percentile(50)
+                perc_25 = tdigest.percentile(25)
+                perc_75 = tdigest.percentile(75)
+                iq_r = perc_75 - perc_25
+
+                if percentiles is not None:
+                    for pc in percentiles:
+                        if pc == 50:
+                            pc_res[pc] = median
+                        elif pc == 25:
+                            pc_res[pc] = perc_25
+                        elif pc == 75:
+                            pc_res[pc] = perc_75
+                        else:
+                            pc_res[pc] = tdigest.percentile(pc)
             else:
-                for pc in percentiles:
-                    if pc == 50:
-                        pc_res[pc] = median
-                    elif pc == 25:
-                        pc_res[pc] = perc_25
-                    elif pc == 75:
-                        pc_res[pc] = perc_75
-                    else:
-                        pc_res[pc] = tdigest.percentile(pc)
+                card = len(set(self.values))
+                sv = sorted(self.values)
+
+                median = utils.percentile(sv, 50)
+                perc_25 = utils.percentile(sv, 25)
+                perc_75 = utils.percentile(sv, 75)
+                iq_r = perc_75 - perc_25
+
+                if percentiles is not None:
+                    for pc in percentiles:
+                        if pc == 50:
+                            pc_res[pc] = median
+                        elif pc == 25:
+                            pc_res[pc] = perc_25
+                        elif pc == 75:
+                            pc_res[pc] = perc_75
+                        else:
+                            pc_res[pc] = utils.percentile(sv, pc)
 
             return ExtendedStats(
                 self.moments.sample_count,
@@ -150,7 +176,7 @@ class ParallelStats(NamedTuple):
                 self.moments.standard_deviation,
                 self.moments.skewness,
                 self.moments.kurtosis,
-                round(hll.card()),
+                card,
                 median,
                 iq_r,
                 pc_res
@@ -169,22 +195,41 @@ class ExtendedCalculator:
       Interquartile Range
     """
 
-    def __init__(self, sample_variance: bool = False, bias_adjust: bool = False, error_rate: float = DEFAULT_ACCURACY) -> None:
+    def __init__(self, sample_variance: bool = False, bias_adjust: bool = False,
+                error_rate: float = DEFAULT_ACCURACY,
+                estimate_threshold: int = -1) -> None:
         """
         Initialise a new calculator.
 
         Parameters
         ----------
         sample_variance: bool, optional
-            set to True to calculate the sample varaiance instead of the population variance
+            Set to True to calculate the sample varaiance instead of the population variance
         bias_adjust: bool, optional
-            set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
+            Set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
         error_rate: float
-            the accuracy of the cardinality estimation
+            The accuracy of the cardinality estimation
+        estimate_threshold: int
+            Use exact cardinality and percentiles until this number of values is reached,
+            then switch to HyperLogLog and TDigest algorithms.
+            Use 0 to always estimate and -1 to calculate the size based on the error rate.
+
         """
+        self._error_rate = error_rate
         self._moment_calc = MomentCalculator(sample_variance, bias_adjust)
-        self._tdigest = TDigest()
-        self._hll = HyperLogLog(error_rate)
+        self._tdigest = None
+        self._hll = None
+        self._values = []
+
+        if estimate_threshold < 0:
+            p = int(math.ceil(math.log((1.04 / error_rate) ** 2, 2)))
+            self._estimate_threshold = 1 << p
+        else:
+            self._estimate_threshold = estimate_threshold
+            if estimate_threshold == 0:
+                self._tdigest = TDigest()
+                self._hll = HyperLogLog(error_rate)
+                self._values = None
 
     def add(self, x: Union[int, float]) -> None:
         """
@@ -193,13 +238,24 @@ class ExtendedCalculator:
         Parameters
         ----------
         x:  Union[int, float]
-            the data point to add
+            The data point to add
         """
 
         if x is not None:
             self._moment_calc.add(x)
-            self._tdigest.update(x)
-            self._hll.add(str(x))
+
+            if self._values is None:
+                self._tdigest.update(x)
+                self._hll.add(str(x))
+            else:
+                self._values.append(x)
+                if len(self._values) >= self._estimate_threshold:
+                    self._tdigest = TDigest()
+                    self._tdigest.batch_update(self._values)
+                    self._hll = HyperLogLog(self._error_rate)
+                    for x2 in self._values:
+                        self._hll.add(str(x2))
+                    self._values = None
 
     def get_parallel(self) -> ParallelStats:
         """
@@ -210,12 +266,18 @@ class ExtendedCalculator:
         Returns
         -------
         Stats
-            named tuple containing the calculated stats
+            Named tuple containing the calculated stats
         """
         moments = self._moment_calc.get()
-        centroids = _get_centroids(self._tdigest)
-        state = _get_state(self._hll)
-        return ParallelStats(moments, centroids, state)
+        if self._values is None:
+            centroids = _get_centroids(self._tdigest)
+            state = _get_state(self._hll)
+            values = []
+        else:
+            centroids = []
+            state = _get_state()
+            values = self._values
+        return ParallelStats(moments, centroids, state, values)
 
     def get(self) -> ExtendedStats:
         """
@@ -224,7 +286,7 @@ class ExtendedCalculator:
         Returns
         -------
         Stats
-            named tuple containing the calculated stats
+            Named tuple containing the calculated stats
         """
         return self.get_parallel().calculate()
 
@@ -236,16 +298,16 @@ def aggregate_extended(stats: List[ParallelStats], sample_variance: bool = False
     Parameters
     ----------
     stats: List[ParallelStats]
-        list of separate instances of calculated ParallelStats from one data set
+        List of separate instances of calculated ParallelStats from one data set
     sample_variance: bool, optional
-        population variance is calculated by default. Set to True to calculate the sample varaiance
+        Population variance is calculated by default. Set to True to calculate the sample varaiance
     bias_adjust: bool, optional
-        set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
+        Set to True to adjust skewness and kurtosis for bias (adjusted Fisher-Pearson)
 
     Returns
     -------
     ParallelStats
-        the combined values
+        The combined values
     """
     if sample_variance is None:
         raise ValueError('Argument "sample_variance" must be a bool, received None.')
@@ -271,25 +333,59 @@ def aggregate_extended(stats: List[ParallelStats], sample_variance: bool = False
     hll: Optional[HyperLogLog] = None
     tdigest = TDigest()
     moments: List[Moments] = []
+    values = []
 
     for s in stats:
-        if hll is None:
-            hll = HyperLogLog(DEFAULT_ACCURACY)
-            _from_state(hll, s.state)
-        else:
-            hll_new = HyperLogLog(DEFAULT_ACCURACY)
-            _from_state(hll_new, s.state)
-            hll.update(hll_new)
-
-        _from_centroids(tdigest, s.centroids)
         moments.append(s.moments)
 
-    moments = aggregate_moments(moments, sample_variance, bias_adjust)
-    centroids = _get_centroids(tdigest)
-    state = _get_state(hll)
+        if len(s.values) == 0:
+            # This result is an estimate
+            if hll is None:
+                # Create new HLL object and populate
+                hll = HyperLogLog(DEFAULT_ACCURACY)
+                _from_state(hll, s.state)
+                # Populate the TDigest centroids
+                _from_centroids(tdigest, s.centroids)
+                # Add any existing values when we first switch to estimators
+                if len(values) > 0:
+                    for v in values:
+                        hll.add(v)
+                    tdigest.batch_update(values)
+                    values = []
+            else:
+                # Update existing estimators from HLL state and centroids
+                hll_new = HyperLogLog(DEFAULT_ACCURACY)
+                _from_state(hll_new, s.state)
+                hll.update(hll_new)
+                # Create local new estimators and combine
+                _from_centroids(tdigest, s.centroids)
+        elif hll is None:
+            # No stats have exceeded the threshold yet
+            # Add the raw values to the list
+             values += s.values
+        else:
+            # We are already estimating
+            # Add the raw values to the estimators
+            for v in s.values:
+                hll.add(v)
+            tdigest.batch_update(s.values)
 
-    return ParallelStats(
-        moments,
-        centroids,
-        state
-    )
+    moments = aggregate_moments(moments, sample_variance, bias_adjust)
+
+    if len(values) > 0:
+        return ParallelStats(
+            moments,
+            [],
+            _get_state(),
+            values
+        )
+    else:
+        centroids = _get_centroids(tdigest)
+        state = _get_state(hll)
+
+        return ParallelStats(
+            moments,
+            centroids,
+            state,
+            []
+        )

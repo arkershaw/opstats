@@ -12,19 +12,20 @@ RANDOM_FLOATS = list(numpy.random.rand(1000))
 
 
 class TestAggregateStats(BaseTestCases.TestStats):
-    def calculate_parallel(self, data_points: List[Union[int, float]], sample_variance: bool = False, bias_adjust: bool = False) -> ExtendedStats:
+    def calculate_parallel(self, data_points: List[Union[int, float]], sample_variance: bool = False, bias_adjust: bool = False, estimate_threshold: int = -1) -> ExtendedStats:
         # Split the list into three to get uneven sample sizes.
         size = len(data_points) // 3
 
         first_data = data_points[:size]
-        first_stats = self.calculate(first_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
-
         second_data = data_points[size:size * 2]
-        second_stats = self.calculate(second_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
-
         third_data = data_points[size * 2:]
-        third_stats = self.calculate(third_data, sample_variance=sample_variance, bias_adjust=bias_adjust)
 
+        return self.calculate_parallel_lists(first_data, second_data, third_data, sample_variance=sample_variance, bias_adjust=bias_adjust, estimate_threshold=estimate_threshold)
+
+    def calculate_parallel_lists(self, first: List[Union[int, float]], second: List[Union[int, float]], third: List[Union[int, float]], sample_variance: bool = False, bias_adjust: bool = False, estimate_threshold: int = -1) -> ExtendedStats:
+        first_stats = self.calculate(first, sample_variance=sample_variance, bias_adjust=bias_adjust, estimate_threshold=estimate_threshold)
+        second_stats = self.calculate(second, sample_variance=sample_variance, bias_adjust=bias_adjust, estimate_threshold=estimate_threshold)
+        third_stats = self.calculate(third, sample_variance=sample_variance, bias_adjust=bias_adjust, estimate_threshold=estimate_threshold)
         return aggregate_extended([first_stats, second_stats, third_stats], sample_variance=sample_variance, bias_adjust=bias_adjust).calculate()
 
     def test_none(self) -> None:
@@ -117,4 +118,30 @@ class TestAggregateStats(BaseTestCases.TestStats):
     def test_aggregate_population_bias_floats(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS, bias_adjust=True)
         result = self.calculate_parallel(RANDOM_FLOATS, bias_adjust=True)
+        self.compare_stats(scipy_result, result)
+
+    def test_without_estimation(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS)
+        result = self.calculate_parallel(RANDOM_FLOATS, estimate_threshold=0)
+        self.compare_stats(scipy_result, result)
+
+    def test_with_estimation(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS)
+        result = self.calculate_parallel(RANDOM_FLOATS, estimate_threshold=1)
+        self.compare_stats(scipy_result, result)
+
+    def test_mixture_with_first_not_estimated(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS)
+        first_data = RANDOM_FLOATS[:50]
+        second_data = RANDOM_FLOATS[50:500]
+        third_data = RANDOM_FLOATS[500:]
+        result = self.calculate_parallel_lists(first_data, second_data, third_data, estimate_threshold=100)
+        self.compare_stats(scipy_result, result)
+
+    def test_mixture_with_first_estimated(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS)
+        first_data = RANDOM_FLOATS[:150]
+        second_data = RANDOM_FLOATS[150:200]
+        third_data = RANDOM_FLOATS[200:]
+        result = self.calculate_parallel_lists(first_data, second_data, third_data, estimate_threshold=100)
         self.compare_stats(scipy_result, result)
