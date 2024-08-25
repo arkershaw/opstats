@@ -7,8 +7,8 @@ from opstats.extended import ExtendedStats, aggregate_extended, ParallelStats, E
 from opstats.tests.base import BaseTestCases
 
 # Use an even number of elements to get uneven sample sizes when dividing into three lists.
-RANDOM_INTS = list(numpy.random.randint(1, 100, 1000))
-RANDOM_FLOATS = list(numpy.random.rand(1000))
+RANDOM_INTS = [int(v) for v in numpy.random.randint(1, 100, 1000)]
+RANDOM_FLOATS = [float(v) for v in numpy.random.rand(1000)]
 
 
 class TestAggregateStats(BaseTestCases.TestStats):
@@ -90,6 +90,11 @@ class TestAggregateStats(BaseTestCases.TestStats):
         result = self.calculate_parallel(RANDOM_INTS)
         self.compare_stats(scipy_result, result, True)
 
+    def test_aggregate_population_integer_strings(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_INTS)
+        result = self.calculate_parallel([str(v) for v in RANDOM_INTS])
+        self.compare_stats(scipy_result, result, True)
+
     def test_aggregate_sample_bias_integers(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_INTS, sample_variance=True, bias_adjust=True)
         result = self.calculate_parallel(RANDOM_INTS, sample_variance=True, bias_adjust=True)
@@ -108,6 +113,11 @@ class TestAggregateStats(BaseTestCases.TestStats):
     def test_aggregate_population_floats(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS)
         result = self.calculate_parallel(RANDOM_FLOATS)
+        self.compare_stats(scipy_result, result)
+
+    def test_aggregate_population_float_strings(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS)
+        result = self.calculate_parallel([str(v) for v in RANDOM_FLOATS])
         self.compare_stats(scipy_result, result)
 
     def test_aggregate_sample_bias_floats(self) -> None:
@@ -130,7 +140,7 @@ class TestAggregateStats(BaseTestCases.TestStats):
         result = self.calculate_parallel(RANDOM_FLOATS, estimate_threshold=1)
         self.compare_stats(scipy_result, result)
 
-    def test_mixture_with_first_not_estimated(self) -> None:
+    def test_mixed_estimation_first_not_estimated(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS)
         first_data = RANDOM_FLOATS[:50]
         second_data = RANDOM_FLOATS[50:500]
@@ -138,10 +148,36 @@ class TestAggregateStats(BaseTestCases.TestStats):
         result = self.calculate_parallel_lists(first_data, second_data, third_data, estimate_threshold=100)
         self.compare_stats(scipy_result, result)
 
-    def test_mixture_with_first_estimated(self) -> None:
+    def test_mixed_estimation_first_estimated(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS)
         first_data = RANDOM_FLOATS[:150]
         second_data = RANDOM_FLOATS[150:200]
         third_data = RANDOM_FLOATS[200:]
+        result = self.calculate_parallel_lists(first_data, second_data, third_data, estimate_threshold=100)
+        self.compare_stats(scipy_result, result)
+
+    def test_aggregate_population_mixed_estimated(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS + [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0])
+        result = self.calculate_parallel(RANDOM_FLOATS + [1, 1.5, '2', '2.5', 'abc', 3.5, 4.0, 4.5, 5.0, 5.5, 6.0], estimate_threshold=0)
+        self.compare_stats(scipy_result, result)
+
+    def test_aggregate_population_mixed_not_estimated(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS + [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0])
+        result = self.calculate_parallel(RANDOM_FLOATS + [1, 1.5, '2', '2.5', 'abc', 3.5, 4.0, 4.5, 5.0, 5.5, 6.0], estimate_threshold=10000)
+        self.compare_stats(scipy_result, result)
+
+    def test_combined_types_mixed_estimation_first_not_estimated(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS + ([1.0, 1.5, 2.0, 2.5, 3.0] * 3))
+        first_data = RANDOM_FLOATS[:50] + [1, 1.5, '2', '2.5', 'abc']
+        second_data = RANDOM_FLOATS[50:500] + [1, 1.5, '2', '2.5', 'abc']
+        third_data = RANDOM_FLOATS[500:] + [1, 1.5, '2', '2.5', 'abc']
+        result = self.calculate_parallel_lists(first_data, second_data, third_data, estimate_threshold=100)
+        self.compare_stats(scipy_result, result)
+
+    def test_combined_types_mixed_estimation_first_estimated(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS + ([1.0, 1.5, 2.0, 2.5, 3.0] * 3))
+        first_data = RANDOM_FLOATS[:150] + [1, 1.5, '2', '2.5', 'abc']
+        second_data = RANDOM_FLOATS[150:200] + [1, 1.5, '2', '2.5', 'abc']
+        third_data = RANDOM_FLOATS[200:] + [1, 1.5, '2', '2.5', 'abc']
         result = self.calculate_parallel_lists(first_data, second_data, third_data, estimate_threshold=100)
         self.compare_stats(scipy_result, result)

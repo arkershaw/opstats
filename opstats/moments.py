@@ -1,6 +1,8 @@
 from math import sqrt
 from typing import NamedTuple, List, Union
 
+from opstats.utils import to_numeric
+
 __all__ = ['Moments', 'MomentCalculator', 'aggregate_moments']
 
 
@@ -69,20 +71,23 @@ class MomentCalculator:
         self._M3 = 0
         self._M4 = 0
 
-    def add(self, x: Union[int, float]) -> None:
+    def add(self, x: Union[int, float, str]) -> None:
         """
         Adds a new data point.
+        Strings will be converted to numeric. For alphanumeric strings, the length will be used.
 
         Parameters
         ----------
-        x:  Union[int, float]
-            The data point to add
+        x:  Union[int, float, str]
+            The data point to add.
         """
 
-        if x is not None:
+        nx = to_numeric(x)
+
+        if nx is not None:
             n1 = self._n
             self._n += 1
-            delta = x - self._mean
+            delta = nx - self._mean
             delta_n = delta / self._n
             delta_n2 = delta_n * delta_n
             term1 = delta * delta_n * n1

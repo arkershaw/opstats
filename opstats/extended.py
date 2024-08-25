@@ -5,7 +5,7 @@ from tdigest import TDigest
 from hyperloglog import HyperLogLog
 
 from opstats.moments import MomentCalculator, aggregate_moments, Moments
-import opstats.utils as utils
+from opstats.utils import to_numeric, percentile
 
 __all__ = ['ExtendedStats', 'ParallelStats', 'ExtendedCalculator', 'aggregate_extended']
 
@@ -151,11 +151,11 @@ class ParallelStats(NamedTuple):
                             pc_res[pc] = tdigest.percentile(pc)
             else:
                 card = len(set(self.values))
-                sv = sorted(self.values)
+                sv = sorted([to_numeric(v) for v in self.values])
 
-                median = utils.percentile(sv, 50)
-                perc_25 = utils.percentile(sv, 25)
-                perc_75 = utils.percentile(sv, 75)
+                median = percentile(sv, 50)
+                perc_25 = percentile(sv, 25)
+                perc_75 = percentile(sv, 75)
                 iq_r = perc_75 - perc_25
 
                 if percentiles is not None:
@@ -167,7 +167,7 @@ class ParallelStats(NamedTuple):
                         elif pc == 75:
                             pc_res[pc] = perc_75
                         else:
-                            pc_res[pc] = utils.percentile(sv, pc)
+                            pc_res[pc] = percentile(sv, pc)
 
             return ExtendedStats(
                 self.moments.sample_count,
@@ -231,27 +231,30 @@ class ExtendedCalculator:
                 self._hll = HyperLogLog(error_rate)
                 self._values = None
 
-    def add(self, x: Union[int, float]) -> None:
+    def add(self, x: Union[int, float, str]) -> None:
         """
         Adds a new data point.
+        Strings will be converted to numeric. For alphanumeric strings, the length will be used.
 
         Parameters
         ----------
-        x:  Union[int, float]
+        x:  Union[int, float, str]
             The data point to add
         """
 
-        if x is not None:
-            self._moment_calc.add(x)
+        nx = to_numeric(x)
+
+        if nx is not None:
+            self._moment_calc.add(nx)
 
             if self._values is None:
-                self._tdigest.update(x)
+                self._tdigest.update(nx)
                 self._hll.add(str(x))
             else:
                 self._values.append(x)
                 if len(self._values) >= self._estimate_threshold:
                     self._tdigest = TDigest()
-                    self._tdigest.batch_update(self._values)
+                    self._tdigest.batch_update([to_numeric(v) for v in self._values])
                     self._hll = HyperLogLog(self._error_rate)
                     for x2 in self._values:
                         self._hll.add(str(x2))
@@ -349,8 +352,8 @@ def aggregate_extended(stats: List[ParallelStats], sample_variance: bool = False
                 # Add any existing values when we first switch to estimators
                 if len(values) > 0:
                     for v in values:
-                        hll.add(v)
-                    tdigest.batch_update(values)
+                        hll.add(str(v))
+                    tdigest.batch_update([to_numeric(v) for v in values])
                     values = []
             else:
                 # Update existing estimators from HLL state and centroids
@@ -362,13 +365,13 @@ def aggregate_extended(stats: List[ParallelStats], sample_variance: bool = False
         elif hll is None:
             # No stats have exceeded the threshold yet
             # Add the raw values to the list
-             values += s.values
+            values += s.values
         else:
             # We are already estimating
             # Add the raw values to the estimators
             for v in s.values:
-                hll.add(v)
-            tdigest.batch_update(s.values)
+                hll.add(str(v))
+            tdigest.batch_update([to_numeric(v) for v in s.values])
 
     moments = aggregate_moments(moments, sample_variance, bias_adjust)
 

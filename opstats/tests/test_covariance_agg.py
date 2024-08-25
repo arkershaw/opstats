@@ -86,3 +86,19 @@ class TestAggregateCovariance(BaseTestCases.TestCovariance):
         scipy_result = self.calculate_scipy(RANDOM_FLOATS[0], RANDOM_FLOATS[1])
         result = self.calculate_parallel(RANDOM_FLOATS[0], RANDOM_FLOATS[1])
         self.compare_covariance(scipy_result, result)
+
+    def test_aggregate_population_float_strings(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS[0], RANDOM_FLOATS[1])
+        result = self.calculate_parallel([str(v) for v in RANDOM_FLOATS[0]], [str(v) for v in RANDOM_FLOATS[1]])
+        self.compare_covariance(scipy_result, result)
+
+    def test_aggregate_population_variance_mixed(self) -> None:
+        scipy_result = self.calculate_scipy(
+            numpy.concatenate([RANDOM_FLOATS[0], [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]]),
+            numpy.concatenate([RANDOM_FLOATS[1], [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]])
+        )
+        result = self.calculate_parallel(
+            numpy.concatenate([RANDOM_FLOATS[0], [1, 1.5, 'ab', 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]]),
+            numpy.concatenate([RANDOM_FLOATS[1], [1, 1.5, 'ab', 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]])
+        )
+        self.compare_covariance(scipy_result, result)

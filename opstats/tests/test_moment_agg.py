@@ -6,8 +6,8 @@ from opstats.moments import Moments, aggregate_moments
 from opstats.tests.base import BaseTestCases
 
 # Use an even number of elements to get uneven sample sizes when dividing into three lists.
-RANDOM_INTS = list(numpy.random.randint(1, 100, 1000))
-RANDOM_FLOATS = list(numpy.random.rand(1000))
+RANDOM_INTS = [int(v) for v in numpy.random.randint(1, 100, 1000)]
+RANDOM_FLOATS = [float(v) for v in numpy.random.rand(1000)]
 
 
 class TestAggregateMoments(BaseTestCases.TestMoments):
@@ -80,6 +80,11 @@ class TestAggregateMoments(BaseTestCases.TestMoments):
         result = self.calculate_parallel(RANDOM_INTS)
         self.compare_moments(scipy_result, result)
 
+    def test_aggregate_population_integer_strings(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_INTS)
+        result = self.calculate_parallel([str(v) for v in RANDOM_INTS])
+        self.compare_moments(scipy_result, result)
+
     def test_aggregate_sample_bias_integers(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_INTS, sample_variance=True, bias_adjust=True)
         result = self.calculate_parallel(RANDOM_INTS, sample_variance=True, bias_adjust=True)
@@ -100,6 +105,11 @@ class TestAggregateMoments(BaseTestCases.TestMoments):
         result = self.calculate_parallel(RANDOM_FLOATS)
         self.compare_moments(scipy_result, result)
 
+    def test_aggregate_population_float_strings(self) -> None:
+        scipy_result = self.calculate_scipy(RANDOM_FLOATS)
+        result = self.calculate_parallel([float(v) for v in RANDOM_FLOATS])
+        self.compare_moments(scipy_result, result)
+
     def test_aggregate_sample_bias_floats(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS, sample_variance=True, bias_adjust=True)
         result = self.calculate_parallel(RANDOM_FLOATS, sample_variance=True, bias_adjust=True)
@@ -108,4 +118,9 @@ class TestAggregateMoments(BaseTestCases.TestMoments):
     def test_aggregate_population_bias_floats(self) -> None:
         scipy_result = self.calculate_scipy(RANDOM_FLOATS, bias_adjust=True)
         result = self.calculate_parallel(RANDOM_FLOATS, bias_adjust=True)
+        self.compare_moments(scipy_result, result)
+
+    def test_aggregate_population_mixed(self) -> None:
+        scipy_result = self.calculate_scipy([1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0])
+        result = self.calculate_parallel([1, 1.5, '2', '2.5', 'abc', 3.5, 4.0, 4.5, 5.0, 5.5, 6.0])
         self.compare_moments(scipy_result, result)

@@ -1,5 +1,6 @@
 from typing import Union, List
 
+from opstats.utils import to_numeric
 from opstats.moments import Moments, MomentCalculator, aggregate_moments
 
 __all__ = ['Covariance', 'CovarianceCalculator', 'aggregate_covariance']
@@ -62,23 +63,27 @@ class CovarianceCalculator:
         self._moment_y = MomentCalculator(sample_variance=sample_covariance)
         self._C = 0
 
-    def add(self, x: Union[int, float], y: Union[int, float]) -> None:
+    def add(self, x: Union[int, float, str], y: Union[int, float, str]) -> None:
         """
         Adds a new data point.
+        Strings will be converted to numeric. For alphanumeric strings, the length will be used.
 
         Parameters
         ----------
-        x:  Union[int, float]
+        x:  Union[int, float, str]
             The first value of the data point to add
-        y:  Union[int, float]
+        y:  Union[int, float, str]
             The second value of the data point to add
         """
 
-        if x is not None and y is not None:
-            dx = x - self._moment_x._mean
-            self._moment_x.add(x)
-            self._moment_y.add(y)
-            self._C += dx * (y - self._moment_y._mean)
+        nx = to_numeric(x)
+        ny = to_numeric(y)
+
+        if nx is not None and ny is not None:
+            dx = nx - self._moment_x._mean
+            self._moment_x.add(nx)
+            self._moment_y.add(ny)
+            self._C += dx * (ny - self._moment_y._mean)
 
     def get(self) -> Covariance:
         """
