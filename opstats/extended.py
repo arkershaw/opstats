@@ -11,7 +11,16 @@ __all__ = ['ExtendedStats', 'ParallelStats', 'ExtendedCalculator', 'aggregate_ex
 
 DEFAULT_ACCURACY = 0.01
 Centroids = List[Tuple[float, int]]
-HLLState = Tuple[float, int, int, List[int]]
+
+
+class HLLState(NamedTuple):
+    """
+    Wrapper class for HyperLogLog state.
+    """
+    alpha: float
+    p: int
+    m: int
+    M: List[int]
 
 
 def _get_centroids(tdigest: TDigest) -> Centroids:
@@ -31,17 +40,17 @@ def _get_state(hll: Optional[HyperLogLog] = None) -> HLLState:
 
     state = hll.__getstate__()
 
-    return (state['alpha'], state['p'], state['m'], state['M'])
+    return HLLState(state['alpha'], state['p'], state['m'], state['M'])
 
 
 def _from_state(hll: HyperLogLog, state: HLLState) -> HyperLogLog:
     assert hll.__slots__ == ('alpha', 'p', 'm', 'M')
 
     state = {
-        'alpha': state[0],
-        'p': state[1],
-        'm': state[2],
-        'M': state[3],
+        'alpha': state.alpha,
+        'p': state.p,
+        'm': state.m,
+        'M': state.M,
     }
 
     hll.__setstate__(state)
@@ -97,15 +106,15 @@ class ParallelStats(NamedTuple):
         The results of moment calculations
     centroids: List[Tuple[float, int]]
         The list of centroids used for approximating percentiles
-    state: Tuple[float, int, int, List[int]]
+    state: HLLState
         The state required for calculating cardinality
-    values: List[Union[int, float]]
+    values: List[Union[int, float, str]]
         The raw values if estimates are not being used
     """
     moments: Moments = Moments()
     centroids: Centroids = []
     state: HLLState = _get_state()
-    values: List[Union[int, float]] = []
+    values: List[Union[int, float, str]] = []
 
     def calculate(self, percentiles: Optional[Iterable[int]] = None) -> ExtendedStats:
         """
